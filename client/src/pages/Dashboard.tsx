@@ -12,19 +12,18 @@ export default function Dashboard() {
   const [editingCoin, setEditingCoin] = useState<string | null>(null);
   const [tempAmount, setTempAmount] = useState("");
 
-  const { data: portfolio = [] } = useQuery<{ coinId: string, amount: string }[]>({
-    queryKey: [api.portfolio.get.path]
+  const [portfolio, setPortfolio] = useState<{ coinId: string, amount: string }[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("portfolio") || "[]");
+    } catch { return []; }
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async (vars: { coinId: string, amount: string }) => {
-      await apiRequest("POST", api.portfolio.update.path, vars);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [api.portfolio.get.path] });
-      setEditingCoin(null);
-    }
-  });
+  const updatePortfolio = (coinId: string, amount: string) => {
+    const updated = [...portfolio.filter(p => p.coinId !== coinId), { coinId, amount }];
+    setPortfolio(updated);
+    localStorage.setItem("portfolio", JSON.stringify(updated));
+    setEditingCoin(null);
+  };
 
   const totalPortfolioValue = portfolio.reduce((acc, item) => {
     const coin = coins?.find(c => c.id === item.coinId);
@@ -179,7 +178,7 @@ export default function Dashboard() {
                         {isEditing ? (
                           <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => updateMutation.mutate({ coinId: coin.id, amount: tempAmount })}
+                              onClick={() => updatePortfolio(coin.id, tempAmount)}
                               className="p-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30"
                             >
                               <Check className="w-4 h-4" />
