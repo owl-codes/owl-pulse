@@ -3,9 +3,8 @@ import { Activity, RefreshCw, Wallet, Edit2, Check, X } from "lucide-react";
 import { useCryptoPrices } from "@/hooks/use-crypto";
 import { CryptoCard } from "@/components/CryptoCard";
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { api, buildUrl } from "@shared/routes";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@shared/routes";
 
 export default function Dashboard() {
   const { data: coins, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useCryptoPrices();
