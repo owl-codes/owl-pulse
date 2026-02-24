@@ -7,7 +7,7 @@ interface CryptoCardProps {
 }
 
 export function CryptoCard({ coin }: CryptoCardProps) {
-  const isPositive = coin.change24h >= 0;
+  const isPositive = (coin.change24h ?? 0) >= 0;
   
   // Format price beautifully
   const formattedPrice = coin.price.toLocaleString("en-US", {
@@ -17,7 +17,7 @@ export function CryptoCard({ coin }: CryptoCardProps) {
     maximumFractionDigits: coin.price < 1 ? 6 : 2, // Show more decimals for cheap coins
   });
 
-  const formattedChange = Math.abs(coin.change24h).toFixed(2);
+  const formattedChange = Math.abs(coin.change24h ?? 0).toFixed(2);
 
   return (
     <div className="group relative bg-card rounded-3xl p-6 border border-border shadow-lg shadow-black/20 hover:border-primary/30 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1.5 overflow-hidden flex flex-col h-full">

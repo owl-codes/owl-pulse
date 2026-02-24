@@ -5,21 +5,20 @@ import { api } from "@shared/routes";
 
 export async function registerRoutes(
   httpServer: Server,
-  app: Express
+  app: Express,
 ): Promise<Server> {
-  
   app.get(api.crypto.prices.path, async (req, res) => {
     try {
       const response = await fetch(
-        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,dogecoin,ripple,open-campus&sparkline=true"
+        "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,dogecoin,ripple,solana,espresso,pudgy-penguins,edu-coin&sparkline=true",
       );
-      
+
       if (!response.ok) {
         throw new Error(`CoinGecko API error: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       const coins = data.map((coin: any) => ({
         id: coin.id,
         symbol: coin.symbol.toUpperCase(),
@@ -27,7 +26,7 @@ export async function registerRoutes(
         image: coin.image,
         price: coin.current_price,
         change24h: coin.price_change_percentage_24h,
-        sparkline: coin.sparkline_in_7d?.price || []
+        sparkline: coin.sparkline_in_7d?.price || [],
       }));
 
       res.status(200).json(coins);
@@ -41,7 +40,7 @@ export async function registerRoutes(
     const user = await storage.getUserByUsername("admin");
     if (!user) return res.status(404).json({ message: "User not found" });
     const items = await storage.getPortfolio(user.id);
-    res.json(items.map(i => ({ coinId: i.coinId, amount: i.amount })));
+    res.json(items.map((i) => ({ coinId: i.coinId, amount: i.amount })));
   });
 
   app.post(api.portfolio.update.path, async (req, res) => {

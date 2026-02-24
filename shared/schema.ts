@@ -30,7 +30,7 @@ export const coinSchema = z.object({
   name: z.string(),
   image: z.string(),
   price: z.number(),
-  change24h: z.number(),
+  change24h: z.number().nullable(),
   sparkline: z.array(z.number()),
 });
 
