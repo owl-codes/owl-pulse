@@ -1,4 +1,4 @@
-import { pgTable, text, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -11,6 +11,18 @@ export const users = pgTable("users", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Portfolio table to store user holdings
+export const portfolio = pgTable("portfolio", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  coinId: text("coin_id").notNull(),
+  amount: text("amount").notNull().default("0"),
+});
+
+export const insertPortfolioSchema = createInsertSchema(portfolio).omit({ id: true });
+export type InsertPortfolio = z.infer<typeof insertPortfolioSchema>;
+export type Portfolio = typeof portfolio.$inferSelect;
 
 export const coinSchema = z.object({
   id: z.string(),

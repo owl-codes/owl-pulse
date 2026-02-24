@@ -1,10 +1,35 @@
 import { motion } from "framer-motion";
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity, RefreshCw, Wallet, Edit2, Check, X } from "lucide-react";
 import { useCryptoPrices } from "@/hooks/use-crypto";
 import { CryptoCard } from "@/components/CryptoCard";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { api, buildUrl } from "@shared/routes";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 export default function Dashboard() {
   const { data: coins, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useCryptoPrices();
+  const [editingCoin, setEditingCoin] = useState<string | null>(null);
+  const [tempAmount, setTempAmount] = useState("");
+
+  const { data: portfolio = [] } = useQuery<{ coinId: string, amount: string }[]>({
+    queryKey: [api.portfolio.get.path]
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (vars: { coinId: string, amount: string }) => {
+      await apiRequest("POST", api.portfolio.update.path, vars);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.portfolio.get.path] });
+      setEditingCoin(null);
+    }
+  });
+
+  const totalPortfolioValue = portfolio.reduce((acc, item) => {
+    const coin = coins?.find(c => c.id === item.coinId);
+    return acc + (coin ? coin.price * parseFloat(item.amount) : 0);
+  }, 0);
 
   const lastUpdated = dataUpdatedAt 
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
@@ -74,7 +99,7 @@ export default function Dashboard() {
         {/* Content Section */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3, 4, 5, 6].map(i => (
               <div key={i} className="h-[280px] rounded-3xl bg-card border border-border relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent -translate-x-full animate-shimmer" />
               </div>
@@ -99,18 +124,109 @@ export default function Dashboard() {
             </button>
           </motion.div>
         ) : (
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-          >
-            {coins?.map((coin) => (
-              <motion.div key={coin.id} variants={itemVariants} className="h-full">
-                <CryptoCard coin={coin} />
-              </motion.div>
-            ))}
-          </motion.div>
+          <div className="space-y-12">
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+            >
+              {coins?.map((coin) => (
+                <motion.div key={coin.id} variants={itemVariants} className="h-full">
+                  <CryptoCard coin={coin} />
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Portfolio Section */}
+            <motion.section 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-panel rounded-[2rem] p-8 md:p-12 border border-border/50 relative overflow-hidden"
+            >
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-10 gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                    <Wallet className="text-primary w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-display font-bold">Portfolio Tracker</h2>
+                    <p className="text-muted-foreground text-sm font-medium">Manage your crypto assets</p>
+                  </div>
+                </div>
+                <div className="bg-card px-8 py-4 rounded-2xl border border-border shadow-xl">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">Total Balance</p>
+                  <p className="text-3xl font-display font-extrabold text-primary">
+                    ${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {coins?.map((coin) => {
+                  const item = portfolio.find(p => p.coinId === coin.id);
+                  const amount = item?.amount || "0";
+                  const value = parseFloat(amount) * coin.price;
+                  const isEditing = editingCoin === coin.id;
+
+                  return (
+                    <div key={coin.id} className="bg-card/30 backdrop-blur-sm border border-border p-6 rounded-2xl group transition-all duration-300 hover:border-primary/30">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <img src={coin.image} alt={coin.name} className="w-8 h-8 rounded-full" />
+                          <span className="font-bold">{coin.symbol}</span>
+                        </div>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => updateMutation.mutate({ coinId: coin.id, amount: tempAmount })}
+                              className="p-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => setEditingCoin(null)}
+                              className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              setEditingCoin(coin.id);
+                              setTempAmount(amount);
+                            }}
+                            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity bg-muted border border-border"
+                          >
+                            <Edit2 className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground uppercase font-bold tracking-tight">Holdings</p>
+                        {isEditing ? (
+                          <input 
+                            type="text" 
+                            autoFocus
+                            value={tempAmount}
+                            onChange={(e) => setTempAmount(e.target.value)}
+                            className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-lg font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                          />
+                        ) : (
+                          <p className="text-xl font-extrabold">{parseFloat(amount).toLocaleString()} {coin.symbol}</p>
+                        )}
+                        <p className="text-sm text-primary font-medium">
+                          ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.section>
+          </div>
         )}
       </div>
     </div>

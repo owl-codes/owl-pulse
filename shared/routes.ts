@@ -1,7 +1,10 @@
 import { z } from 'zod';
-import { coinSchema } from './schema';
+import { coinSchema, insertPortfolioSchema } from './schema';
 
 export const errorSchemas = {
+  validation: z.object({
+    message: z.string(),
+  }),
   internal: z.object({
     message: z.string(),
   }),
@@ -15,6 +18,30 @@ export const api = {
       responses: {
         200: z.array(coinSchema),
         500: errorSchemas.internal,
+      },
+    },
+  },
+  portfolio: {
+    get: {
+      method: 'GET' as const,
+      path: '/api/portfolio' as const,
+      responses: {
+        200: z.array(z.object({
+          coinId: z.string(),
+          amount: z.string(),
+        })),
+      },
+    },
+    update: {
+      method: 'POST' as const,
+      path: '/api/portfolio' as const,
+      input: z.object({
+        coinId: z.string(),
+        amount: z.string(),
+      }),
+      responses: {
+        200: z.object({ success: z.boolean() }),
+        400: errorSchemas.validation,
       },
     },
   },
