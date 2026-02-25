@@ -1,0 +1,24 @@
+[build]
+  command = "npx vite build"
+  publish = "dist/public"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Proxy API calls to Netlify Functions
+[[redirects]]
+  from = "/api/crypto/prices"
+  to = "/.netlify/functions/crypto-prices"
+  status = 200
+
+[[redirects]]
+  from = "/api/crypto/search"
+  to = "/.netlify/functions/crypto-search"
+  status = 200
+
+# SPA fallback — must be last
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
