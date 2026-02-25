@@ -3,8 +3,6 @@ import { Activity, RefreshCw, Wallet, Edit2, Check, X } from "lucide-react";
 import { useCryptoPrices } from "@/hooks/use-crypto";
 import { CryptoCard } from "@/components/CryptoCard";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
 
 export default function Dashboard() {
   const { data: coins, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useCryptoPrices();
@@ -18,7 +16,10 @@ export default function Dashboard() {
   });
 
   const updatePortfolio = (coinId: string, amount: string) => {
-    const updated = [...portfolio.filter(p => p.coinId !== coinId), { coinId, amount }];
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed < 0) return;
+    const sanitized = String(parsed);
+    const updated = [...portfolio.filter(p => p.coinId !== coinId), { coinId, amount: sanitized }];
     setPortfolio(updated);
     localStorage.setItem("portfolio", JSON.stringify(updated));
     setEditingCoin(null);
@@ -205,11 +206,14 @@ export default function Dashboard() {
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground uppercase font-bold tracking-tight">Holdings</p>
                         {isEditing ? (
-                          <input 
-                            type="text" 
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
                             autoFocus
                             value={tempAmount}
                             onChange={(e) => setTempAmount(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") updatePortfolio(coin.id, tempAmount); }}
                             className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-lg font-bold focus:ring-2 focus:ring-primary/20 outline-none"
                           />
                         ) : (
