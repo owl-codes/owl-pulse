@@ -70,13 +70,3 @@
     @apply bg-card/60 backdrop-blur-xl border border-white/5 shadow-xl;
   }
 }
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-.animate-shimmer {
-  animation: shimmer 2s infinite;
-}

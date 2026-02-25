@@ -1,15 +1,28 @@
 import { motion } from "framer-motion";
-import { Activity, RefreshCw, Wallet, Edit2, Check, X } from "lucide-react";
+import { Activity, RefreshCw, Wallet, Edit2, Check, X, Plus, Trash2 } from "lucide-react";
 import { useCryptoPrices } from "@/hooks/use-crypto";
 import { CryptoCard } from "@/components/CryptoCard";
+import { AddTokenSearch } from "@/components/AddTokenSearch";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
+
+const DEFAULT_COIN_IDS = [
+  "bitcoin", "ethereum", "dogecoin", "ripple", "solana", "espresso", "pudgy-penguins", "edu-coin",
+];
+
+function loadTrackedCoins(): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem("trackedCoins") || "null");
+    if (Array.isArray(stored) && stored.length > 0) return stored;
+  } catch { /* ignore */ }
+  return DEFAULT_COIN_IDS;
+}
 
 export default function Dashboard() {
-  const { data: coins, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useCryptoPrices();
+  const [trackedCoins, setTrackedCoins] = useState<string[]>(loadTrackedCoins);
+  const { data: coins, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useCryptoPrices(trackedCoins);
   const [editingCoin, setEditingCoin] = useState<string | null>(null);
   const [tempAmount, setTempAmount] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
 
   const [portfolio, setPortfolio] = useState<{ coinId: string, amount: string }[]>(() => {
     try {
@@ -17,8 +30,25 @@ export default function Dashboard() {
     } catch { return []; }
   });
 
+  const updateTrackedCoins = (newList: string[]) => {
+    setTrackedCoins(newList);
+    localStorage.setItem("trackedCoins", JSON.stringify(newList));
+  };
+
+  const addCoin = (coinId: string) => {
+    if (trackedCoins.includes(coinId)) return;
+    updateTrackedCoins([...trackedCoins, coinId]);
+  };
+
+  const removeCoin = (coinId: string) => {
+    updateTrackedCoins(trackedCoins.filter(id => id !== coinId));
+  };
+
   const updatePortfolio = (coinId: string, amount: string) => {
-    const updated = [...portfolio.filter(p => p.coinId !== coinId), { coinId, amount }];
+    const parsed = parseFloat(amount);
+    if (isNaN(parsed) || parsed < 0) return;
+    const sanitized = String(parsed);
+    const updated = [...portfolio.filter(p => p.coinId !== coinId), { coinId, amount: sanitized }];
     setPortfolio(updated);
     localStorage.setItem("portfolio", JSON.stringify(updated));
     setEditingCoin(null);
@@ -29,8 +59,8 @@ export default function Dashboard() {
     return acc + (coin ? coin.price * parseFloat(item.amount) : 0);
   }, 0);
 
-  const lastUpdated = dataUpdatedAt 
-    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+  const lastUpdated = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '';
 
   // Container animation variants
@@ -51,13 +81,13 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 relative overflow-hidden">
-      
+
       {/* Background ambient glows */}
       <div className="fixed top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px] pointer-events-none" />
       <div className="fixed bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-blue-500/5 blur-[120px] pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-6 py-12 md:py-20 relative z-10">
-        
+
         {/* Header Section */}
         <header className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-border/50 pb-8">
           <div className="flex items-center gap-5">
@@ -82,7 +112,15 @@ export default function Dashboard() {
               </span>
               {lastUpdated ? `Updated at ${lastUpdated}` : 'Connecting...'}
             </div>
-            
+
+            <button
+              onClick={() => setShowSearch(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary text-primary-foreground font-semibold hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all duration-300 shadow-lg shadow-primary/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Token</span>
+            </button>
+
             <button
               onClick={() => refetch()}
               disabled={isRefetching}
@@ -104,7 +142,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : isError ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center justify-center py-24 text-center glass-panel rounded-3xl"
@@ -114,8 +152,8 @@ export default function Dashboard() {
             </div>
             <h3 className="text-2xl font-display font-bold mb-2">Connection Error</h3>
             <p className="text-muted-foreground mb-6 max-w-md">We couldn't reach the crypto market data. Please check your connection and try again.</p>
-            <button 
-              onClick={() => refetch()} 
+            <button
+              onClick={() => refetch()}
               className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
             >
               Try Again
@@ -123,21 +161,45 @@ export default function Dashboard() {
           </motion.div>
         ) : (
           <div className="space-y-12">
-            <motion.div 
+            <motion.div
               variants={containerVariants}
               initial="hidden"
               animate="show"
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
             >
               {coins?.map((coin) => (
-                <motion.div key={coin.id} variants={itemVariants} className="h-full">
+                <motion.div key={coin.id} variants={itemVariants} className="h-full relative group/card">
                   <CryptoCard coin={coin} />
+                  {/* Remove button — top right corner on hover */}
+                  <button
+                    onClick={() => removeCoin(coin.id)}
+                    className="absolute top-3 right-3 z-20 p-1.5 rounded-lg bg-destructive/80 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-destructive"
+                    aria-label={`Remove ${coin.name}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </motion.div>
               ))}
+
+              {/* Add Token Card */}
+              <motion.div variants={itemVariants} className="h-full">
+                <button
+                  onClick={() => setShowSearch(true)}
+                  className="w-full h-full min-h-[280px] rounded-3xl border-2 border-dashed border-border hover:border-primary/50 bg-card/30 flex flex-col items-center justify-center gap-4 transition-all duration-300 hover:bg-card/50 group"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:bg-primary/20 transition-colors">
+                    <Plus className="w-7 h-7 text-primary" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-display font-bold text-foreground text-lg">Add Token</p>
+                    <p className="text-sm text-muted-foreground">Search CoinGecko</p>
+                  </div>
+                </button>
+              </motion.div>
             </motion.div>
 
             {/* Portfolio Section */}
-            <motion.section 
+            <motion.section
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               className="glass-panel rounded-[2rem] p-8 md:p-12 border border-border/50 relative overflow-hidden"
@@ -176,13 +238,13 @@ export default function Dashboard() {
                         </div>
                         {isEditing ? (
                           <div className="flex items-center gap-2">
-                            <button 
+                            <button
                               onClick={() => updatePortfolio(coin.id, tempAmount)}
                               className="p-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30"
                             >
                               <Check className="w-4 h-4" />
                             </button>
-                            <button 
+                            <button
                               onClick={() => setEditingCoin(null)}
                               className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20"
                             >
@@ -190,7 +252,7 @@ export default function Dashboard() {
                             </button>
                           </div>
                         ) : (
-                          <button 
+                          <button
                             onClick={() => {
                               setEditingCoin(coin.id);
                               setTempAmount(amount);
@@ -205,11 +267,14 @@ export default function Dashboard() {
                       <div className="space-y-1">
                         <p className="text-xs text-muted-foreground uppercase font-bold tracking-tight">Holdings</p>
                         {isEditing ? (
-                          <input 
-                            type="text" 
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
                             autoFocus
                             value={tempAmount}
                             onChange={(e) => setTempAmount(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") updatePortfolio(coin.id, tempAmount); }}
                             className="w-full bg-muted border border-border rounded-lg px-3 py-1.5 text-lg font-bold focus:ring-2 focus:ring-primary/20 outline-none"
                           />
                         ) : (
@@ -227,6 +292,15 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Search Modal */}
+      {showSearch && (
+        <AddTokenSearch
+          trackedIds={trackedCoins}
+          onAdd={addCoin}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
     </div>
   );
 }
