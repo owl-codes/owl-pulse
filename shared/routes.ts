@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { coinSchema } from './schema';
+import { coinSchema, coinSearchResultSchema } from './schema';
 
 export const api = {
   crypto: {
@@ -8,6 +8,14 @@ export const api = {
       path: '/api/crypto/prices' as const,
       responses: {
         200: z.array(coinSchema),
+        500: z.object({ message: z.string() }),
+      },
+    },
+    search: {
+      method: 'GET' as const,
+      path: '/api/crypto/search' as const,
+      responses: {
+        200: z.array(coinSearchResultSchema),
         500: z.object({ message: z.string() }),
       },
     },
