@@ -1,14 +1,16 @@
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Star } from "lucide-react";
 import { type Coin } from "@shared/schema";
 import { SparklineChart } from "./SparklineChart";
 
 interface CryptoCardProps {
   coin: Coin;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
-export function CryptoCard({ coin }: CryptoCardProps) {
+export function CryptoCard({ coin, isFavorite, onToggleFavorite }: CryptoCardProps) {
   const isPositive = (coin.change24h ?? 0) >= 0;
-  
+
   // Format price beautifully
   const formattedPrice = coin.price.toLocaleString("en-US", {
     style: "currency",
@@ -21,7 +23,7 @@ export function CryptoCard({ coin }: CryptoCardProps) {
 
   return (
     <div className="group relative bg-card rounded-3xl p-6 border border-border shadow-lg shadow-black/20 hover:border-primary/30 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/5 hover:-translate-y-1.5 overflow-hidden flex flex-col h-full">
-      
+
       {/* Subtle glass reflection effect */}
       <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent pointer-events-none" />
 
@@ -30,10 +32,10 @@ export function CryptoCard({ coin }: CryptoCardProps) {
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 bg-white/20 rounded-full blur-md group-hover:blur-lg transition-all" />
-            <img 
-              src={coin.image} 
-              alt={coin.name} 
-              className="w-12 h-12 rounded-full relative z-10 border border-white/10 shadow-sm" 
+            <img
+              src={coin.image}
+              alt={coin.name}
+              className="w-12 h-12 rounded-full relative z-10 border border-white/10 shadow-sm"
             />
           </div>
           <div>
@@ -41,15 +43,32 @@ export function CryptoCard({ coin }: CryptoCardProps) {
             <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{coin.symbol}</span>
           </div>
         </div>
-        
-        {/* Trend Badge */}
-        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border ${
-          isPositive 
-            ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]' 
-            : 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
-        }`}>
-          {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-          {formattedChange}%
+
+        <div className="flex items-center gap-2">
+          {/* Favorite button */}
+          {onToggleFavorite && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+              className={`p-1.5 rounded-lg transition-all ${
+                isFavorite
+                  ? 'text-yellow-400'
+                  : 'text-muted-foreground opacity-0 group-hover:opacity-100'
+              }`}
+              aria-label={isFavorite ? `Unpin ${coin.name}` : `Pin ${coin.name}`}
+            >
+              <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-400' : ''}`} />
+            </button>
+          )}
+
+          {/* Trend Badge */}
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border ${
+            isPositive
+              ? 'bg-green-500/10 text-green-400 border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]'
+              : 'bg-red-500/10 text-red-400 border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+          }`}>
+            {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+            {formattedChange}%
+          </div>
         </div>
       </div>
 
