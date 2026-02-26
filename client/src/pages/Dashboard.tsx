@@ -277,47 +277,49 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-12">
             {/* Draggable Token Grid */}
-            <Reorder.Group
-              axis="y"
-              values={orderedIds}
-              onReorder={(newOrder) => {
-                // Separate favorites and non-favorites to preserve pinning
-                const favs = newOrder.filter(id => favorites.includes(id));
-                const rest = newOrder.filter(id => !favorites.includes(id));
-                handleReorder([...favs, ...rest]);
-              }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-              as="div"
-            >
-              {sortedCoins?.map((coin) => (
-                <Reorder.Item
-                  key={coin.id}
-                  value={coin.id}
-                  className="h-full relative group/card"
-                  whileDrag={{ scale: 1.03, zIndex: 50, boxShadow: "0 25px 50px rgba(0,0,0,0.3)" }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                >
-                  {/* Drag handle */}
-                  <div className="absolute top-3 left-3 z-20 p-1 rounded-lg cursor-grab active:cursor-grabbing opacity-0 group-hover/card:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground">
-                    <GripVertical className="w-4 h-4" />
-                  </div>
-                  <CryptoCard
-                    coin={coin}
-                    isFavorite={favorites.includes(coin.id)}
-                    onToggleFavorite={() => toggleFavorite(coin.id)}
-                  />
-                  {/* Remove button */}
-                  <button
-                    onClick={() => removeCoin(coin.id)}
-                    className="absolute top-3 right-3 z-20 p-1.5 rounded-lg bg-destructive/80 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-destructive"
-                    aria-label={`Remove ${coin.name}`}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <Reorder.Group
+                axis="y"
+                values={orderedIds}
+                onReorder={(newOrder) => {
+                  // Separate favorites and non-favorites to preserve pinning
+                  const favs = newOrder.filter(id => favorites.includes(id));
+                  const rest = newOrder.filter(id => !favorites.includes(id));
+                  handleReorder([...favs, ...rest]);
+                }}
+                as="div"
+                style={{ display: "contents" }}
+              >
+                {sortedCoins?.map((coin) => (
+                  <Reorder.Item
+                    key={coin.id}
+                    value={coin.id}
+                    className="h-full relative group/card"
+                    whileDrag={{ scale: 1.03, zIndex: 50, boxShadow: "0 25px 50px rgba(0,0,0,0.3)" }}
+                    transition={{ type: "spring", stiffness: 300, damping: 25 }}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </Reorder.Item>
-              ))}
+                    {/* Drag handle */}
+                    <div className="absolute top-3 left-3 z-20 p-1 rounded-lg cursor-grab active:cursor-grabbing opacity-0 group-hover/card:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground">
+                      <GripVertical className="w-4 h-4" />
+                    </div>
+                    <CryptoCard
+                      coin={coin}
+                      isFavorite={favorites.includes(coin.id)}
+                      onToggleFavorite={() => toggleFavorite(coin.id)}
+                    />
+                    {/* Remove button */}
+                    <button
+                      onClick={() => removeCoin(coin.id)}
+                      className="absolute top-3 right-3 z-20 p-1.5 rounded-lg bg-destructive/80 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-destructive"
+                      aria-label={`Remove ${coin.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </Reorder.Item>
+                ))}
+              </Reorder.Group>
 
-              {/* Add Token Card (not draggable) */}
+              {/* Add Token Card (outside Reorder.Group to avoid errors) */}
               <motion.div
                 variants={itemVariants}
                 initial="hidden"
@@ -337,7 +339,7 @@ export default function Dashboard() {
                   </div>
                 </button>
               </motion.div>
-            </Reorder.Group>
+            </div>
 
             {/* Portfolio Section */}
             <motion.section
