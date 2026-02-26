@@ -1,38 +1,55 @@
-import { motion } from "framer-motion";
-import { Activity, RefreshCw, Wallet, Edit2, Check, X, Plus, Trash2 } from "lucide-react";
+import { motion, Reorder } from "framer-motion";
+import { Activity, RefreshCw, Wallet, Edit2, Check, X, Plus, Trash2, Bell, GripVertical } from "lucide-react";
 import { useCryptoPrices } from "@/hooks/use-crypto";
 import { CryptoCard } from "@/components/CryptoCard";
 import { AddTokenSearch } from "@/components/AddTokenSearch";
-import { useState } from "react";
+import { PriceAlertModal, type PriceAlert } from "@/components/PriceAlertModal";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { type Coin } from "@shared/schema";
 
 const DEFAULT_COIN_IDS = [
   "bitcoin", "ethereum", "dogecoin", "ripple", "solana", "espresso", "pudgy-penguins", "edu-coin",
 ];
 
-function loadTrackedCoins(): string[] {
+function loadFromStorage<T>(key: string, fallback: T): T {
   try {
-    const stored = JSON.parse(localStorage.getItem("trackedCoins") || "null");
-    if (Array.isArray(stored) && stored.length > 0) return stored;
+    const stored = JSON.parse(localStorage.getItem(key) || "null");
+    if (stored !== null) return stored;
   } catch { /* ignore */ }
-  return DEFAULT_COIN_IDS;
+  return fallback;
+}
+
+function saveToStorage(key: string, value: unknown) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
 export default function Dashboard() {
-  const [trackedCoins, setTrackedCoins] = useState<string[]>(loadTrackedCoins);
+  const [trackedCoins, setTrackedCoins] = useState<string[]>(() => loadFromStorage("trackedCoins", DEFAULT_COIN_IDS));
+  const [favorites, setFavorites] = useState<string[]>(() => loadFromStorage("favorites", []));
+  const [alerts, setAlerts] = useState<PriceAlert[]>(() => loadFromStorage("priceAlerts", []));
   const { data: coins, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useCryptoPrices(trackedCoins);
   const [editingCoin, setEditingCoin] = useState<string | null>(null);
   const [tempAmount, setTempAmount] = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const prevPricesRef = useRef<Record<string, number>>({});
 
-  const [portfolio, setPortfolio] = useState<{ coinId: string, amount: string }[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("portfolio") || "[]");
-    } catch { return []; }
-  });
+  const [portfolio, setPortfolio] = useState<{ coinId: string, amount: string }[]>(() =>
+    loadFromStorage("portfolio", [])
+  );
+
+  // Sort coins: favorites first, then in tracked order
+  const sortedCoins = coins ? [...coins].sort((a, b) => {
+    const aFav = favorites.includes(a.id);
+    const bFav = favorites.includes(b.id);
+    if (aFav && !bFav) return -1;
+    if (!aFav && bFav) return 1;
+    return trackedCoins.indexOf(a.id) - trackedCoins.indexOf(b.id);
+  }) : undefined;
 
   const updateTrackedCoins = (newList: string[]) => {
     setTrackedCoins(newList);
-    localStorage.setItem("trackedCoins", JSON.stringify(newList));
+    saveToStorage("trackedCoins", newList);
   };
 
   const addCoin = (coinId: string) => {
@@ -42,7 +59,28 @@ export default function Dashboard() {
 
   const removeCoin = (coinId: string) => {
     updateTrackedCoins(trackedCoins.filter(id => id !== coinId));
+    setFavorites(prev => {
+      const next = prev.filter(id => id !== coinId);
+      saveToStorage("favorites", next);
+      return next;
+    });
   };
+
+  const toggleFavorite = (coinId: string) => {
+    setFavorites(prev => {
+      const next = prev.includes(coinId) ? prev.filter(id => id !== coinId) : [...prev, coinId];
+      saveToStorage("favorites", next);
+      return next;
+    });
+  };
+
+  // Drag reorder handler
+  const handleReorder = (newOrder: string[]) => {
+    updateTrackedCoins(newOrder);
+  };
+
+  // Build the ordered ID list for the Reorder component (favorites first, then rest)
+  const orderedIds = sortedCoins?.map(c => c.id) || [];
 
   const updatePortfolio = (coinId: string, amount: string) => {
     const parsed = parseFloat(amount);
@@ -50,9 +88,79 @@ export default function Dashboard() {
     const sanitized = String(parsed);
     const updated = [...portfolio.filter(p => p.coinId !== coinId), { coinId, amount: sanitized }];
     setPortfolio(updated);
-    localStorage.setItem("portfolio", JSON.stringify(updated));
+    saveToStorage("portfolio", updated);
     setEditingCoin(null);
   };
+
+  // --- Price Alerts ---
+  const addAlert = useCallback((alert: Omit<PriceAlert, "id" | "createdAt">) => {
+    const newAlert: PriceAlert = { ...alert, id: crypto.randomUUID(), createdAt: Date.now() };
+    setAlerts(prev => {
+      const next = [...prev, newAlert];
+      saveToStorage("priceAlerts", next);
+      return next;
+    });
+  }, []);
+
+  const removeAlert = useCallback((alertId: string) => {
+    setAlerts(prev => {
+      const next = prev.filter(a => a.id !== alertId);
+      saveToStorage("priceAlerts", next);
+      return next;
+    });
+  }, []);
+
+  // Check alerts on each price update
+  useEffect(() => {
+    if (!coins || alerts.length === 0) return;
+
+    const prevPrices = prevPricesRef.current;
+    const triggeredIds: string[] = [];
+
+    for (const alert of alerts) {
+      const coin = coins.find(c => c.id === alert.coinId);
+      if (!coin) continue;
+
+      const prev = prevPrices[coin.id];
+      // Only trigger if we have a previous price to compare (avoid triggering on first load)
+      if (prev === undefined) continue;
+
+      const triggered =
+        (alert.direction === "above" && prev < alert.targetPrice && coin.price >= alert.targetPrice) ||
+        (alert.direction === "below" && prev > alert.targetPrice && coin.price <= alert.targetPrice);
+
+      if (triggered) {
+        triggeredIds.push(alert.id);
+        if (Notification.permission === "granted") {
+          new Notification(`${coin.symbol} Price Alert`, {
+            body: `${coin.name} is now ${alert.direction === "above" ? "above" : "below"} $${alert.targetPrice.toLocaleString()} — current: $${coin.price.toLocaleString()}`,
+            icon: coin.image,
+          });
+        }
+      }
+    }
+
+    // Remove triggered alerts
+    if (triggeredIds.length > 0) {
+      setAlerts(prev => {
+        const next = prev.filter(a => !triggeredIds.includes(a.id));
+        saveToStorage("priceAlerts", next);
+        return next;
+      });
+    }
+
+    // Update previous prices
+    const newPrices: Record<string, number> = {};
+    for (const coin of coins) newPrices[coin.id] = coin.price;
+    prevPricesRef.current = newPrices;
+  }, [coins, alerts]);
+
+  // Request notification permission on first alert
+  useEffect(() => {
+    if (alerts.length > 0 && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, [alerts.length]);
 
   const totalPortfolioValue = portfolio.reduce((acc, item) => {
     const coin = coins?.find(c => c.id === item.coinId);
@@ -63,15 +171,9 @@ export default function Dashboard() {
     ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '';
 
-  // Container animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   };
 
   const itemVariants = {
@@ -92,7 +194,6 @@ export default function Dashboard() {
         <header className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8 border-b border-border/50 pb-8">
           <div className="flex items-center gap-5">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_30px_rgba(var(--primary),0.15)] relative">
-              {/* Pulsing ring behind the icon container */}
               <div className="absolute inset-0 rounded-2xl border border-primary/30 animate-ping opacity-20" />
               <Activity className="text-primary w-7 h-7 relative z-10" />
             </div>
@@ -104,7 +205,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="hidden md:flex items-center gap-3 text-sm font-medium text-muted-foreground bg-card/50 backdrop-blur-sm px-5 py-2.5 rounded-full border border-border shadow-inner">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
@@ -112,6 +213,19 @@ export default function Dashboard() {
               </span>
               {lastUpdated ? `Updated at ${lastUpdated}` : 'Connecting...'}
             </div>
+
+            <button
+              onClick={() => setShowAlerts(true)}
+              className="relative flex items-center justify-center p-3.5 rounded-full bg-card border border-border shadow-lg hover:border-primary/50 hover:bg-muted focus:outline-none focus:ring-4 focus:ring-primary/20 transition-all duration-300 group"
+              aria-label="Price Alerts"
+            >
+              <Bell className="w-5 h-5 text-foreground group-hover:text-primary transition-colors" />
+              {alerts.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center">
+                  {alerts.length}
+                </span>
+              )}
+            </button>
 
             <button
               onClick={() => setShowSearch(true)}
@@ -161,16 +275,37 @@ export default function Dashboard() {
           </motion.div>
         ) : (
           <div className="space-y-12">
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="show"
+            {/* Draggable Token Grid */}
+            <Reorder.Group
+              axis="y"
+              values={orderedIds}
+              onReorder={(newOrder) => {
+                // Separate favorites and non-favorites to preserve pinning
+                const favs = newOrder.filter(id => favorites.includes(id));
+                const rest = newOrder.filter(id => !favorites.includes(id));
+                handleReorder([...favs, ...rest]);
+              }}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+              as="div"
             >
-              {coins?.map((coin) => (
-                <motion.div key={coin.id} variants={itemVariants} className="h-full relative group/card">
-                  <CryptoCard coin={coin} />
-                  {/* Remove button — top right corner on hover */}
+              {sortedCoins?.map((coin) => (
+                <Reorder.Item
+                  key={coin.id}
+                  value={coin.id}
+                  className="h-full relative group/card"
+                  whileDrag={{ scale: 1.03, zIndex: 50, boxShadow: "0 25px 50px rgba(0,0,0,0.3)" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                >
+                  {/* Drag handle */}
+                  <div className="absolute top-3 left-3 z-20 p-1 rounded-lg cursor-grab active:cursor-grabbing opacity-0 group-hover/card:opacity-60 hover:!opacity-100 transition-opacity text-muted-foreground">
+                    <GripVertical className="w-4 h-4" />
+                  </div>
+                  <CryptoCard
+                    coin={coin}
+                    isFavorite={favorites.includes(coin.id)}
+                    onToggleFavorite={() => toggleFavorite(coin.id)}
+                  />
+                  {/* Remove button */}
                   <button
                     onClick={() => removeCoin(coin.id)}
                     className="absolute top-3 right-3 z-20 p-1.5 rounded-lg bg-destructive/80 text-white opacity-0 group-hover/card:opacity-100 transition-opacity hover:bg-destructive"
@@ -178,11 +313,16 @@ export default function Dashboard() {
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                </motion.div>
+                </Reorder.Item>
               ))}
 
-              {/* Add Token Card */}
-              <motion.div variants={itemVariants} className="h-full">
+              {/* Add Token Card (not draggable) */}
+              <motion.div
+                variants={itemVariants}
+                initial="hidden"
+                animate="show"
+                className="h-full"
+              >
                 <button
                   onClick={() => setShowSearch(true)}
                   className="w-full h-full min-h-[280px] rounded-3xl border-2 border-dashed border-border hover:border-primary/50 bg-card/30 flex flex-col items-center justify-center gap-4 transition-all duration-300 hover:bg-card/50 group"
@@ -196,7 +336,7 @@ export default function Dashboard() {
                   </div>
                 </button>
               </motion.div>
-            </motion.div>
+            </Reorder.Group>
 
             {/* Portfolio Section */}
             <motion.section
@@ -223,7 +363,7 @@ export default function Dashboard() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {coins?.map((coin) => {
+                {sortedCoins?.map((coin) => {
                   const item = portfolio.find(p => p.coinId === coin.id);
                   const amount = item?.amount || "0";
                   const value = parseFloat(amount) * coin.price;
@@ -293,12 +433,21 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Search Modal */}
+      {/* Modals */}
       {showSearch && (
         <AddTokenSearch
           trackedIds={trackedCoins}
           onAdd={addCoin}
           onClose={() => setShowSearch(false)}
+        />
+      )}
+      {showAlerts && coins && (
+        <PriceAlertModal
+          coins={coins}
+          alerts={alerts}
+          onAdd={addAlert}
+          onRemove={removeAlert}
+          onClose={() => setShowAlerts(false)}
         />
       )}
     </div>
