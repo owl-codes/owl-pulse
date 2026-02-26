@@ -1,4 +1,4 @@
-# CryptoPulse
+# OwlPulse
 
 Live crypto price tracker with portfolio management.
 

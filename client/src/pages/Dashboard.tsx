@@ -1,9 +1,10 @@
 import { motion, Reorder } from "framer-motion";
-import { Activity, RefreshCw, Wallet, Edit2, Check, X, Plus, Trash2, Bell, GripVertical } from "lucide-react";
+import { RefreshCw, Wallet, Edit2, Check, X, Plus, Trash2, Bell, GripVertical, Activity } from "lucide-react";
 import { useCryptoPrices } from "@/hooks/use-crypto";
 import { CryptoCard } from "@/components/CryptoCard";
 import { AddTokenSearch } from "@/components/AddTokenSearch";
 import { PriceAlertModal, type PriceAlert } from "@/components/PriceAlertModal";
+import { OwlLogo } from "@/components/OwlLogo";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { type Coin } from "@shared/schema";
 
@@ -195,11 +196,11 @@ export default function Dashboard() {
           <div className="flex items-center gap-5">
             <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_30px_rgba(var(--primary),0.15)] relative">
               <div className="absolute inset-0 rounded-2xl border border-primary/30 animate-ping opacity-20" />
-              <Activity className="text-primary w-7 h-7 relative z-10" />
+              <OwlLogo className="w-9 h-9 text-primary relative z-10" />
             </div>
             <div>
               <h1 className="text-4xl md:text-5xl font-display font-extrabold tracking-tight text-foreground drop-shadow-sm">
-                Crypto<span className="text-primary">Pulse</span>
+                Owl<span className="text-primary">Pulse</span>
               </h1>
               <p className="text-muted-foreground font-medium mt-1.5 text-lg">Live market overview</p>
             </div>
