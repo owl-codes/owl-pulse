@@ -202,7 +202,8 @@ export default function Dashboard() {
               <h1 className="text-4xl md:text-5xl font-display font-extrabold tracking-tight text-foreground drop-shadow-sm">
                 Owl<span className="text-primary">Pulse</span>
               </h1>
-              <p className="text-muted-foreground font-medium mt-1.5 text-lg">Live market overview</p>
+              <p className="text-muted-foreground font-bold mt-1 text-sm tracking-widest uppercase">LMAOWL</p>
+              <p className="text-muted-foreground font-medium mt-0.5 text-lg">Live market overview</p>
             </div>
           </div>
 
